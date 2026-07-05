@@ -1,15 +1,13 @@
 package itu.webdynamique.framework;
 
-import itu.webdynamique.framework.annotation.Controller;
-import itu.webdynamique.framework.annotation.UrlMapping;
-import itu.webdynamique.framework.util.PackageScanner;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Map;
+
 import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,56 +15,27 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class FrontServlet extends HttpServlet {
 
-    private HashMap<VerbUrl, Mapping> urlMappingMap = new HashMap<>();
+    private Map<VerbUrl, Mapping> urlMappingMap;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
-        try {
 
-            String packageToScan = config.getInitParameter("package_controllers");
-            if (packageToScan == null || packageToScan.trim().isEmpty()) {
-                throw new ServletException("Parametre 'package_controllers' manquant dans web.xml");
-            }
+        ServletContext servletContext = config.getServletContext();
+        Object attribute = servletContext.getAttribute(FrameworkContextListener.MAPPING_MAP_ATTRIBUTE);
 
-            List<Class<?>> allClasses = PackageScanner.findByPackage(packageToScan);
-
-            for (Class<?> cls : allClasses) {
-
-                if (!cls.isAnnotationPresent(Controller.class))
-                    continue;
-
-                for (Method method : cls.getDeclaredMethods()) {
-
-                    if (!method.isAnnotationPresent(UrlMapping.class))
-                        continue;
-
-                    UrlMapping annotation = method.getAnnotation(UrlMapping.class);
-                    String url = annotation.value();
-                    String methodeHttp = annotation.method();
-
-                    VerbUrl cle = new VerbUrl(url, methodeHttp);
-
-                    if (urlMappingMap.containsKey(cle)) {
-                        throw new ServletException(
-                                "Conflit : " + cle + " est declaree deux ");
-                    }
-
-                    urlMappingMap.put(cle, new Mapping(cls.getName(), method.getName()));
-
-                    System.out.println("[framework] enregistre : "
-                            + cle + " -> "
-                            + cls.getSimpleName() + "." + method.getName() + "()");
-                }
-            }
-
-            System.out.println("[framework] " + urlMappingMap.size() + " mapping(s) charge(s).");
-
-        } catch (ServletException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServletException("Erreur lors du scan", e);
+        if (attribute instanceof Map<?, ?>) {
+            @SuppressWarnings("unchecked")
+            Map<VerbUrl, Mapping> sharedMap = (Map<VerbUrl, Mapping>) attribute;
+            this.urlMappingMap = sharedMap;
+            return;
         }
+
+        this.urlMappingMap = new HashMap<>();
+
+        String packageToScan = config.getInitParameter("package_controllers");
+        MappingInitializer initializer = new MappingInitializer();
+        initializer.initializeMappings(packageToScan, this.urlMappingMap);
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -93,13 +62,11 @@ public class FrontServlet extends HttpServlet {
         if (urlMappingMap.containsKey(cle)) {
             Mapping mapping = urlMappingMap.get(cle);
             out.println("=== URL reconnue ===");
-            out.println("Requête  : " + cle);
+            out.println("Requete  : " + cle);
             out.println("Classe   : " + mapping.getClassName());
             out.println("Methode  : " + mapping.getMethodName());
 
-            //sprint3 BIS
             try {
-
                 Class<?> laClasse = Class.forName(mapping.getClassName());
                 Object instance = laClasse.getDeclaredConstructor().newInstance();
                 Method laMethode = laClasse.getDeclaredMethod(mapping.getMethodName());
@@ -115,7 +82,6 @@ public class FrontServlet extends HttpServlet {
             return;
         }
 
-        //URL inconnue → erreur + liste des mappings disponibles
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
         out.println("=== URL non supportee ===");
         out.println("Demandee : " + cle);
