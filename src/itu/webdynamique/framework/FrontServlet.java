@@ -3,9 +3,10 @@ package itu.webdynamique.framework;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.HashMap;
 
+import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -17,25 +18,33 @@ public class FrontServlet extends HttpServlet {
 
     private Map<VerbUrl, Mapping> urlMappingMap;
 
+    private String prefixe;
+    private String suffixe;
+
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
 
         ServletContext servletContext = config.getServletContext();
-        Object attribute = servletContext.getAttribute(FrameworkContextListener.MAPPING_MAP_ATTRIBUTE);
+        Object attribute = servletContext.getAttribute(
+                FrameworkContextListener.MAPPING_MAP_ATTRIBUTE);
 
         if (attribute instanceof Map<?, ?>) {
             @SuppressWarnings("unchecked")
             Map<VerbUrl, Mapping> sharedMap = (Map<VerbUrl, Mapping>) attribute;
             this.urlMappingMap = sharedMap;
-            return;
+        } else {
+            this.urlMappingMap = new HashMap<>();
+            String packageToScan = config.getInitParameter("package_controllers");
+            MappingInitializer initializer = new MappingInitializer();
+            initializer.initializeMappings(packageToScan, this.urlMappingMap);
         }
 
-        this.urlMappingMap = new HashMap<>();
+        this.prefixe = config.getInitParameter("prefixe");
+        this.suffixe = config.getInitParameter("suffixe");
 
-        String packageToScan = config.getInitParameter("package_controllers");
-        MappingInitializer initializer = new MappingInitializer();
-        initializer.initializeMappings(packageToScan, this.urlMappingMap);
+        System.out.println("[Framework] prefixe = " + prefixe);
+        System.out.println("[Framework] suffixe = " + suffixe);
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -45,7 +54,6 @@ public class FrontServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
 
         String httpMethod = request.getMethod().toUpperCase();
-
         String contextPath = request.getContextPath();
         String requestedUrl = request.getRequestURI().substring(contextPath.length());
 
@@ -61,23 +69,36 @@ public class FrontServlet extends HttpServlet {
 
         if (urlMappingMap.containsKey(cle)) {
             Mapping mapping = urlMappingMap.get(cle);
-            out.println("=== URL reconnue ===");
-            out.println("Requete  : " + cle);
-            out.println("Classe   : " + mapping.getClassName());
-            out.println("Methode  : " + mapping.getMethodName());
 
             try {
                 Class<?> laClasse = Class.forName(mapping.getClassName());
                 Object instance = laClasse.getDeclaredConstructor().newInstance();
                 Method laMethode = laClasse.getDeclaredMethod(mapping.getMethodName());
 
-                laMethode.invoke(instance);
+                Object resultat = laMethode.invoke(instance);
 
-                out.println("Methode executee. (voir console Tomcat)");
+                if (resultat instanceof ModelAndView) {
+                    ModelAndView mv = (ModelAndView) resultat;
+                    String cheminJsp = prefixe + mv.getUrl() + suffixe;
+                    if (!cheminJsp.startsWith("/")) {
+                        cheminJsp = "/" + cheminJsp;
+                    }
+
+                    for (Map.Entry<String, Object> entry : mv.getData().entrySet()) {
+                        request.setAttribute(entry.getKey(), entry.getValue());
+                    }
+
+                    RequestDispatcher dispatcher = getServletContext().getRequestDispatcher(cheminJsp);
+                    dispatcher.forward(request, response);
+
+                } else {
+                    out.println("Methode executee. (pas de ModelAndView retourne)");
+                }
 
             } catch (Exception e) {
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                out.println("Erreur lors de l'execution : " + e.getMessage());
+                out.println("Erreur : " + e.getMessage());
+                e.printStackTrace();
             }
             return;
         }
