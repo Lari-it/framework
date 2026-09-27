@@ -41,12 +41,23 @@ public class FrontServlet extends HttpServlet {
             MappingInitializer initializer = new MappingInitializer();
             initializer.initializeMappings(packageToScan, this.urlMappingMap);
         }
-
         this.prefixe = config.getInitParameter("prefixe");
         this.suffixe = config.getInitParameter("suffixe");
 
         System.out.println("[Framework] prefixe = " + prefixe);
         System.out.println("[Framework] suffixe = " + suffixe);
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        processRequest(request, response);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        processRequest(request, response);
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -78,7 +89,6 @@ public class FrontServlet extends HttpServlet {
 
                 Object resultat = laMethode.invoke(instance);
 
-                
                 if (laMethode.isAnnotationPresent(Json.class)) {
 
                     response.setContentType("application/json;charset=UTF-8");
@@ -118,6 +128,8 @@ public class FrontServlet extends HttpServlet {
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
         PrintWriter out = response.getWriter();
         out.println("URL non supportee : " + requestedUrl);
+        System.out.println("URL recue : " + requestedUrl);
+        System.out.println("Methode HTTP : " + httpMethod);
         out.println("URLs disponibles :");
         for (VerbUrl k : urlMappingMap.keySet()) {
             out.println("  " + k);
