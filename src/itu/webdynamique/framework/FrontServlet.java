@@ -13,6 +13,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import itu.webdynamique.framework.annotation.Json;
+import com.google.gson.Gson;
 
 public class FrontServlet extends HttpServlet {
 
@@ -50,14 +52,13 @@ public class FrontServlet extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        response.setContentType("text/plain;charset=UTF-8");
-        PrintWriter out = response.getWriter();
-
         String httpMethod = request.getMethod().toUpperCase();
         String contextPath = request.getContextPath();
         String requestedUrl = request.getRequestURI().substring(contextPath.length());
 
         if (requestedUrl.equals("/") || requestedUrl.isEmpty()) {
+            response.setContentType("text/plain;charset=UTF-8");
+            PrintWriter out = response.getWriter();
             out.println("=== Mappings supportes ===");
             for (VerbUrl cle : urlMappingMap.keySet()) {
                 out.println(cle + "  ->  " + urlMappingMap.get(cle));
@@ -77,51 +78,49 @@ public class FrontServlet extends HttpServlet {
 
                 Object resultat = laMethode.invoke(instance);
 
-                if (resultat instanceof ModelAndView) {
-                    ModelAndView mv = (ModelAndView) resultat;
-                    String cheminJsp = prefixe + mv.getUrl() + suffixe;
-                    if (!cheminJsp.startsWith("/")) {
-                        cheminJsp = "/" + cheminJsp;
-                    }
+                
+                if (laMethode.isAnnotationPresent(Json.class)) {
 
-                    for (Map.Entry<String, Object> entry : mv.getData().entrySet()) {
-                        request.setAttribute(entry.getKey(), entry.getValue());
-                    }
+                    response.setContentType("application/json;charset=UTF-8");
+                    PrintWriter out = response.getWriter();
 
-                    RequestDispatcher dispatcher = getServletContext().getRequestDispatcher(cheminJsp);
-                    dispatcher.forward(request, response);
+                    if (resultat instanceof String) {
+                        out.print((String) resultat);
+                    } else {
+                        Gson gson = new Gson();
+                        out.print(gson.toJson(resultat));
+                    }
 
                 } else {
-                    out.println("Methode executee. (pas de ModelAndView retourne)");
+
+                    if (resultat instanceof ModelAndView) {
+                        ModelAndView mv = (ModelAndView) resultat;
+                        String cheminJsp = prefixe + mv.getUrl() + suffixe;
+                        for (Map.Entry<String, Object> entry : mv.getData().entrySet()) {
+                            request.setAttribute(entry.getKey(), entry.getValue());
+                        }
+                        request.getRequestDispatcher(cheminJsp).forward(request, response);
+                    } else {
+                        response.setContentType("text/plain;charset=UTF-8");
+                        response.getWriter().println("Methode executee sans retour.");
+                    }
+
                 }
 
             } catch (Exception e) {
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                out.println("Erreur : " + e.getMessage());
-                e.printStackTrace();
+                response.getWriter().println("Erreur : " + e.getMessage());
             }
             return;
         }
 
+        response.setContentType("text/plain;charset=UTF-8");
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-        out.println("=== URL non supportee ===");
-        out.println("Demandee : " + cle);
-        out.println("");
+        PrintWriter out = response.getWriter();
+        out.println("URL non supportee : " + requestedUrl);
         out.println("URLs disponibles :");
         for (VerbUrl k : urlMappingMap.keySet()) {
             out.println("  " + k);
         }
-    }
-
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        processRequest(request, response);
-    }
-
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        processRequest(request, response);
     }
 }
