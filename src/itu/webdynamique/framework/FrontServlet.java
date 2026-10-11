@@ -14,6 +14,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import itu.webdynamique.framework.annotation.Json;
+import itu.webdynamique.framework.util.Binder;
+
 import com.google.gson.Gson;
 
 import java.lang.reflect.Parameter;
@@ -88,8 +90,8 @@ public class FrontServlet extends HttpServlet {
                 Class<?> laClasse = Class.forName(mapping.getClassName());
                 Object instance = laClasse.getDeclaredConstructor().newInstance();
                 Method laMethode = trouverMethode(laClasse, mapping.getMethodName());
-
-                Object resultat = executerMethode(laMethode, instance, request);
+                Object[] args = Binder.bindParams(laMethode, request);
+                Object resultat = laMethode.invoke(instance, args);
 
                 if (laMethode.isAnnotationPresent(Json.class)) {
 
@@ -137,42 +139,6 @@ public class FrontServlet extends HttpServlet {
             out.println("  " + k);
         }
 
-    }
-
-    private Object executerMethode(Method laMethode, Object instance, HttpServletRequest request)
-            throws Exception {
-
-        Parameter[] params = laMethode.getParameters();
-
-        if (params.length == 0) {
-            return laMethode.invoke(instance);
-        }
-
-        Object[] valeurs = new Object[params.length];
-
-        for (int i = 0; i < params.length; i++) {
-            String nom = params[i].getName();
-            Class<?> type = params[i].getType();
-            String valeurBrute = request.getParameter(nom);
-
-            if (type == String.class) {
-                valeurs[i] = valeurBrute;
-            } else if (type == int.class || type == Integer.class) {
-                valeurs[i] = valeurBrute != null ? Integer.parseInt(valeurBrute) : 0;
-            } else if (type == double.class || type == Double.class) {
-                valeurs[i] = valeurBrute != null ? Double.parseDouble(valeurBrute) : 0.0;
-            } else if (type == long.class || type == Long.class) {
-                valeurs[i] = valeurBrute != null ? Long.parseLong(valeurBrute) : 0L;
-            } else if (type == float.class || type == Float.class) {
-                valeurs[i] = valeurBrute != null ? Float.parseFloat(valeurBrute) : 0.0f;
-            } else if (type == boolean.class || type == Boolean.class) {
-                valeurs[i] = valeurBrute != null ? Boolean.parseBoolean(valeurBrute) : false;
-            } else {
-                valeurs[i] = null;
-            }
-        }
-
-        return laMethode.invoke(instance, valeurs);
     }
 
     private Method trouverMethode(Class<?> laClasse, String nomMethode) throws Exception {
