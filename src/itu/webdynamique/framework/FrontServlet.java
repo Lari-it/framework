@@ -15,9 +15,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import itu.webdynamique.framework.annotation.Json;
 import com.google.gson.Gson;
+import jakarta.servlet.annotation.MultipartConfig;
+import itu.webdynamique.framework.Binder;
 
 import java.lang.reflect.Parameter;
 
+@MultipartConfig
 public class FrontServlet extends HttpServlet {
 
     private Map<VerbUrl, Mapping> urlMappingMap;
@@ -148,31 +151,13 @@ public class FrontServlet extends HttpServlet {
             return laMethode.invoke(instance);
         }
 
-        Object[] valeurs = new Object[params.length];
+        Object boundParams = Binder.bindParams(params, request);
 
-        for (int i = 0; i < params.length; i++) {
-            String nom = params[i].getName();
-            Class<?> type = params[i].getType();
-            String valeurBrute = request.getParameter(nom);
-
-            if (type == String.class) {
-                valeurs[i] = valeurBrute;
-            } else if (type == int.class || type == Integer.class) {
-                valeurs[i] = valeurBrute != null ? Integer.parseInt(valeurBrute) : 0;
-            } else if (type == double.class || type == Double.class) {
-                valeurs[i] = valeurBrute != null ? Double.parseDouble(valeurBrute) : 0.0;
-            } else if (type == long.class || type == Long.class) {
-                valeurs[i] = valeurBrute != null ? Long.parseLong(valeurBrute) : 0L;
-            } else if (type == float.class || type == Float.class) {
-                valeurs[i] = valeurBrute != null ? Float.parseFloat(valeurBrute) : 0.0f;
-            } else if (type == boolean.class || type == Boolean.class) {
-                valeurs[i] = valeurBrute != null ? Boolean.parseBoolean(valeurBrute) : false;
-            } else {
-                valeurs[i] = null;
-            }
+        if (boundParams instanceof Object[]) {
+            return laMethode.invoke(instance, (Object[]) boundParams);
+        } else {
+            return laMethode.invoke(instance, boundParams);
         }
-
-        return laMethode.invoke(instance, valeurs);
     }
 
     private Method trouverMethode(Class<?> laClasse, String nomMethode) throws Exception {
