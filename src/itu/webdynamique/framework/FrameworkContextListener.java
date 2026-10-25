@@ -10,6 +10,7 @@ import java.util.Map;
 public class FrameworkContextListener implements ServletContextListener {
 
     public static final String MAPPING_MAP_ATTRIBUTE = "framework.urlMappingMap";
+    public static final String SESSION_MAP_ATTRIBUTE = "framework.sessionMap";
 
     @Override
     public void contextInitialized(ServletContextEvent event) {
@@ -27,10 +28,15 @@ public class FrameworkContextListener implements ServletContextListener {
         } catch (Exception e) {
             throw new RuntimeException("Erreur lors du chargement des mappings au demarrage", e);
         }
+
+        Map<String, Session> sessionMap = new HashMap<>();
+        context.setAttribute(SESSION_MAP_ATTRIBUTE, sessionMap);
+        System.out.println("[framework] session map initialisee au demarrage de l'application.");
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent event) {
         event.getServletContext().removeAttribute(MAPPING_MAP_ATTRIBUTE);
+        event.getServletContext().removeAttribute(SESSION_MAP_ATTRIBUTE);
     }
 }

@@ -12,6 +12,10 @@ import java.util.List;
 public class Binder {
 
     public static Object bindParams(Parameter[] params, HttpServletRequest request) throws Exception {
+        return bindParams(params, request, null);
+    }
+
+    public static Object bindParams(Parameter[] params, HttpServletRequest request, Session session) throws Exception {
         if (params.length == 0) {
             return null;
         }
@@ -21,8 +25,11 @@ public class Binder {
             Class<?> type = param.getType();
             String paramName = param.getName();
 
+            if (type == Session.class) {
+                return session;
+            }
             
-            if (isSimpleType(type)) {
+            else if (isSimpleType(type)) {
                 return convertSimpleType(paramName, type, request);
             }
             
@@ -44,7 +51,9 @@ public class Binder {
             Class<?> type = param.getType();
             String paramName = param.getName();
 
-            if (isSimpleType(type)) {
+            if (type == Session.class) {
+                values[i] = session;
+            } else if (isSimpleType(type)) {
                 values[i] = convertSimpleType(paramName, type, request);
             } else if (type == MapFile.class) {
                 values[i] = createMapFile(paramName, request);
