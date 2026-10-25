@@ -14,16 +14,19 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import itu.webdynamique.framework.annotation.Json;
+import itu.webdynamique.framework.annotation.Auth;
 import com.google.gson.Gson;
 import jakarta.servlet.annotation.MultipartConfig;
 import itu.webdynamique.framework.Binder;
 
 import java.lang.reflect.Parameter;
+import java.util.UUID;
 
 @MultipartConfig
 public class FrontServlet extends HttpServlet {
 
     private Map<VerbUrl, Mapping> urlMappingMap;
+    private Map<String, Session> sessionMap;
 
     private String prefixe;
     private String suffixe;
@@ -46,6 +49,17 @@ public class FrontServlet extends HttpServlet {
             MappingInitializer initializer = new MappingInitializer();
             initializer.initializeMappings(packageToScan, this.urlMappingMap);
         }
+
+        Object sessionAttribute = servletContext.getAttribute(
+                FrameworkContextListener.SESSION_MAP_ATTRIBUTE);
+        if (sessionAttribute instanceof Map<?, ?>) {
+            @SuppressWarnings("unchecked")
+            Map<String, Session> sharedSessionMap = (Map<String, Session>) sessionAttribute;
+            this.sessionMap = sharedSessionMap;
+        } else {
+            this.sessionMap = new HashMap<>();
+        }
+
         this.prefixe = config.getInitParameter("prefixe");
         this.suffixe = config.getInitParameter("suffixe");
 
@@ -92,7 +106,18 @@ public class FrontServlet extends HttpServlet {
                 Object instance = laClasse.getDeclaredConstructor().newInstance();
                 Method laMethode = trouverMethode(laClasse, mapping.getMethodName());
 
-                Object resultat = executerMethode(laMethode, instance, request);
+                Session session = getOrCreateSession(request);
+
+                if (laMethode.isAnnotationPresent(Auth.class)) {
+                    if (session == null || !session.isAuthenticated()) {
+                        response.setContentType("text/plain;charset=UTF-8");
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.getWriter().println("Erreur : Authentification requise");
+                        return;
+                    }
+                }
+
+                Object resultat = executerMethode(laMethode, instance, request, session);
 
                 if (laMethode.isAnnotationPresent(Json.class)) {
 
@@ -142,7 +167,7 @@ public class FrontServlet extends HttpServlet {
 
     }
 
-    private Object executerMethode(Method laMethode, Object instance, HttpServletRequest request)
+    private Object executerMethode(Method laMethode, Object instance, HttpServletRequest request, Session session)
             throws Exception {
 
         Parameter[] params = laMethode.getParameters();
@@ -151,7 +176,7 @@ public class FrontServlet extends HttpServlet {
             return laMethode.invoke(instance);
         }
 
-        Object boundParams = Binder.bindParams(params, request);
+        Object boundParams = Binder.bindParams(params, request, session);
 
         if (boundParams instanceof Object[]) {
             return laMethode.invoke(instance, (Object[]) boundParams);
@@ -167,5 +192,19 @@ public class FrontServlet extends HttpServlet {
             }
         }
         throw new Exception("Methode introuvable : " + nomMethode);
+    }
+
+    private Session getOrCreateSession(HttpServletRequest request) {
+        String sessionId = request.getParameter("sessionId");
+
+        if (sessionId != null && sessionMap.containsKey(sessionId)) {
+            return sessionMap.get(sessionId);
+        }
+
+        String newSessionId = UUID.randomUUID().toString();
+        Session newSession = new Session(newSessionId);
+        sessionMap.put(newSessionId, newSession);
+
+        return newSession;
     }
 }
