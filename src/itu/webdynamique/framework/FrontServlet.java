@@ -27,6 +27,7 @@ public class FrontServlet extends HttpServlet {
 
     private Map<VerbUrl, Mapping> urlMappingMap;
     private Map<String, Session> sessionMap;
+    private final Map<Class<?>, Object> controllerInstances = new HashMap<>();
 
     private String prefixe;
     private String suffixe;
@@ -113,7 +114,7 @@ public class FrontServlet extends HttpServlet {
 
             try {
                 Class<?> laClasse = Class.forName(mapping.getClassName());
-                Object instance = laClasse.getDeclaredConstructor().newInstance();
+                Object instance = getSingleton(laClasse);
                 Method laMethode = trouverMethode(laClasse, mapping.getMethodName());
 
                 Session session = getOrCreateSession(request);
@@ -201,6 +202,15 @@ public class FrontServlet extends HttpServlet {
         } else {
             return laMethode.invoke(instance, boundParams);
         }
+    }
+
+    private synchronized Object getSingleton(Class<?> laClasse) throws Exception {
+        Object instance = controllerInstances.get(laClasse);
+        if (instance == null) {
+            instance = laClasse.getDeclaredConstructor().newInstance();
+            controllerInstances.put(laClasse, instance);
+        }
+        return instance;
     }
 
     private Method trouverMethode(Class<?> laClasse, String nomMethode) throws Exception {
