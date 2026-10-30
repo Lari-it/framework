@@ -21,15 +21,18 @@ public class Binder {
             Class<?> type = param.getType();
             String paramName = param.getName();
 
-            
+            if (type == Session.class) {
+                return new Session(request);
+            }
+
             if (isSimpleType(type)) {
                 return convertSimpleType(paramName, type, request);
             }
-            
+
             else if (type == MapFile.class) {
                 return createMapFile(paramName, request);
             }
-            
+
             else {
                 Object instance = type.getDeclaredConstructor().newInstance();
                 bindObjectFields(instance, request);
@@ -37,14 +40,15 @@ public class Binder {
             }
         }
 
-        
         Object[] values = new Object[params.length];
         for (int i = 0; i < params.length; i++) {
             Parameter param = params[i];
             Class<?> type = param.getType();
             String paramName = param.getName();
 
-            if (isSimpleType(type)) {
+            if (type == Session.class) {
+                values[i] = new Session(request);
+            } else if (isSimpleType(type)) {
                 values[i] = convertSimpleType(paramName, type, request);
             } else if (type == MapFile.class) {
                 values[i] = createMapFile(paramName, request);

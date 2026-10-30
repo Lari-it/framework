@@ -13,6 +13,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import itu.webdynamique.framework.annotation.Auth;
 import itu.webdynamique.framework.annotation.Json;
 import com.google.gson.Gson;
 import jakarta.servlet.annotation.MultipartConfig;
@@ -27,6 +28,7 @@ public class FrontServlet extends HttpServlet {
 
     private String prefixe;
     private String suffixe;
+    private String authSessionAttributeName;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -49,8 +51,22 @@ public class FrontServlet extends HttpServlet {
         this.prefixe = config.getInitParameter("prefixe");
         this.suffixe = config.getInitParameter("suffixe");
 
+        String configuredName = servletContext.getInitParameter("auth_session_name");
+        if (configuredName == null || configuredName.trim().isEmpty()) {
+            configuredName = servletContext.getInitParameter("session_name");
+        }
+        if (configuredName == null || configuredName.trim().isEmpty()) {
+            configuredName = config.getInitParameter("auth_session_name");
+        }
+        if (configuredName == null || configuredName.trim().isEmpty()) {
+            configuredName = config.getInitParameter("session_name");
+        }
+        this.authSessionAttributeName = (configuredName == null || configuredName.trim().isEmpty()) ? "user" : configuredName.trim();
+        servletContext.setAttribute("framework.authSessionAttributeName", this.authSessionAttributeName);
+
         System.out.println("[Framework] prefixe = " + prefixe);
         System.out.println("[Framework] suffixe = " + suffixe);
+        System.out.println("[Framework] auth session attribute = " + this.authSessionAttributeName);
     }
 
     @Override
@@ -91,6 +107,13 @@ public class FrontServlet extends HttpServlet {
                 Class<?> laClasse = Class.forName(mapping.getClassName());
                 Object instance = laClasse.getDeclaredConstructor().newInstance();
                 Method laMethode = trouverMethode(laClasse, mapping.getMethodName());
+
+                if (laMethode.isAnnotationPresent(Auth.class) && !isAuthenticated(request)) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("text/plain;charset=UTF-8");
+                    response.getWriter().println("Acces interdit. Vous devez etre authentifie.");
+                    return;
+                }
 
                 Object resultat = executerMethode(laMethode, instance, request);
 
@@ -140,6 +163,19 @@ public class FrontServlet extends HttpServlet {
             out.println("  " + k);
         }
 
+    }
+
+    private boolean isAuthenticated(HttpServletRequest request) {
+        if (authSessionAttributeName == null || authSessionAttributeName.trim().isEmpty()) {
+            return false;
+        }
+
+        jakarta.servlet.http.HttpSession session = request.getSession(false);
+        if (session == null) {
+            return false;
+        }
+
+        return session.getAttribute(authSessionAttributeName) != null;
     }
 
     private Object executerMethode(Method laMethode, Object instance, HttpServletRequest request)
