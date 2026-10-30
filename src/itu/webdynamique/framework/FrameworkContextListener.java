@@ -12,6 +12,7 @@ public class FrameworkContextListener implements ServletContextListener {
     public static final String MAPPING_MAP_ATTRIBUTE = "framework.urlMappingMap";
     public static final String SESSION_MAP_ATTRIBUTE = "framework.sessionMap";
     public static final String AUTH_SESSION_NAME_ATTRIBUTE = "framework.authSessionName";
+    public static final String ROLE_SESSION_NAME_ATTRIBUTE = "framework.roleSessionName";
 
     @Override
     public void contextInitialized(ServletContextEvent event) {
