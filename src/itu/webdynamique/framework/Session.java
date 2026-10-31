@@ -38,8 +38,11 @@ public class Session {
         return createdAt;
     }
 
-    public boolean isAuthenticated() {
-        return attributes.containsKey("user");
+    public boolean isAuthenticated(String authSessionName) {
+        if (authSessionName == null || authSessionName.trim().isEmpty()) {
+            return false;
+        }
+        return attributes.get(authSessionName) != null;
     }
 
     @Override

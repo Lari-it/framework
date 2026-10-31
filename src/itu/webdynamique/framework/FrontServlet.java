@@ -30,6 +30,7 @@ public class FrontServlet extends HttpServlet {
 
     private String prefixe;
     private String suffixe;
+    private String authSessionName;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -63,8 +64,12 @@ public class FrontServlet extends HttpServlet {
         this.prefixe = config.getInitParameter("prefixe");
         this.suffixe = config.getInitParameter("suffixe");
 
+        this.authSessionName = config.getInitParameter("auth_session_name");
+        servletContext.setAttribute(FrameworkContextListener.AUTH_SESSION_NAME_ATTRIBUTE, this.authSessionName);
+
         System.out.println("[Framework] prefixe = " + prefixe);
         System.out.println("[Framework] suffixe = " + suffixe);
+        System.out.println("[Framework] auth_session_name = " + authSessionName);
     }
 
     @Override
@@ -109,7 +114,7 @@ public class FrontServlet extends HttpServlet {
                 Session session = getOrCreateSession(request);
 
                 if (laMethode.isAnnotationPresent(Auth.class)) {
-                    if (session == null || !session.isAuthenticated()) {
+                    if (session == null || !session.isAuthenticated(authSessionName)) {
                         response.setContentType("text/plain;charset=UTF-8");
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         response.getWriter().println("Erreur : Authentification requise");
