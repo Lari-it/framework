@@ -45,6 +45,14 @@ public class Session {
         return attributes.get(authSessionName) != null;
     }
 
+    public boolean hasRole(String roleSessionName, String role) {
+        if (roleSessionName == null || roleSessionName.trim().isEmpty()) {
+            return false;
+        }
+        Object valeur = attributes.get(roleSessionName);
+        return valeur != null && valeur.toString().equals(role);
+    }
+
     @Override
     public String toString() {
         return "Session{" +

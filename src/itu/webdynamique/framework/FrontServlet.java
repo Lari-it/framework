@@ -31,6 +31,7 @@ public class FrontServlet extends HttpServlet {
     private String prefixe;
     private String suffixe;
     private String authSessionName;
+    private String roleSessionName;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -67,9 +68,13 @@ public class FrontServlet extends HttpServlet {
         this.authSessionName = config.getInitParameter("auth_session_name");
         servletContext.setAttribute(FrameworkContextListener.AUTH_SESSION_NAME_ATTRIBUTE, this.authSessionName);
 
+        this.roleSessionName = config.getInitParameter("role_session_name");
+        servletContext.setAttribute(FrameworkContextListener.ROLE_SESSION_NAME_ATTRIBUTE, this.roleSessionName);
+
         System.out.println("[Framework] prefixe = " + prefixe);
         System.out.println("[Framework] suffixe = " + suffixe);
         System.out.println("[Framework] auth_session_name = " + authSessionName);
+        System.out.println("[Framework] role_session_name = " + roleSessionName);
     }
 
     @Override
@@ -118,6 +123,14 @@ public class FrontServlet extends HttpServlet {
                         response.setContentType("text/plain;charset=UTF-8");
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         response.getWriter().println("Erreur : Authentification requise");
+                        return;
+                    }
+
+                    String roleRequis = laMethode.getAnnotation(Auth.class).role();
+                    if (!roleRequis.isEmpty() && !session.hasRole(roleSessionName, roleRequis)) {
+                        response.setContentType("text/plain;charset=UTF-8");
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.getWriter().println("Erreur : Role '" + roleRequis + "' requis");
                         return;
                     }
                 }
